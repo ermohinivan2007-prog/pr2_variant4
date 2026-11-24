@@ -9,6 +9,11 @@ from src.auth import check_auth
 
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 8080
+STATUS_OK = 200
+STATUS_BAD_REQUEST = 400
+STATUS_UNAUTHORIZED = 401
+STATUS_NOT_FOUND = 404
+STATUS_SERVER_ERROR = 500
 
 DB_MEMBERS = {}
 DB_ASSIGNMENTS = {}
@@ -36,7 +41,7 @@ class APIHandler(BaseHTTPRequestHandler):
     def _check_authorization(self) -> bool:
         auth_header = self.headers.get("Authorization")
         if not check_auth(auth_header):
-            self._send_json(401, {"error": "Unauthorized"})
+            self._send_json(STATUS_UNAUTHORIZED, {"error": "Unauthorized"})
             return False
         return True
 
@@ -56,68 +61,103 @@ class APIHandler(BaseHTTPRequestHandler):
         if self.path.startswith("/public/api/submit-member/"):
             uid = get_next_id()
             DB_MEMBERS[uid] = self._read_body()
-            self._send_json(200, {"uid": uid, "status": "created"})
+            self._send_json(STATUS_OK, {"uid": uid, "status": "created"})
         elif self.path.startswith("/public/api/submit-assignment/"):
             uid = get_next_id()
             DB_ASSIGNMENTS[uid] = self._read_body()
-            self._send_json(200, {"uid": uid, "status": "created"})
+            self._send_json(STATUS_OK, {"uid": uid, "status": "created"})
         else:
-            self._send_json(404, {"error": "Not found"})
+            self._send_json(STATUS_NOT_FOUND, {"error": "Not found"})
+
+    def _handle_load_member(self):
+        self._send_json(STATUS_OK, {"items": list(DB_MEMBERS.values())})
+
+    def _handle_load_assignment(self):
+        member_id = self.path.split("/")[-1]
+        items = [
+            a for a in DB_ASSIGNMENTS.values()
+            if str(a.get("member")) == member_id
+        ]
+        self._send_json(STATUS_OK, {"items": items})
+
+    def _handle_load_output(self):
+        assignment_id = self.path.split("/")[-1]
+        items = [
+            o for o in DB_OUTPUTS.values()
+            if str(o.get("assignment")) == assignment_id
+        ]
+        self._send_json(STATUS_OK, {"items": items})
+
+    def _handle_load_report(self):
+        input_file = "examples/input1.txt"
+        output_file = "examples/report.json"
+        try:
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m", "src.cli",
+                    input_file,
+                    "-o", output_file
+                ],
+                check=True,
+                capture_output=True
+            )
+            with open(output_file, "r", encoding="utf-8") as f:
+                report_data = json.load(f)
+            self._send_json(STATUS_OK, {"report": report_data})
+        except Exception as e:
+            self._send_json(STATUS_SERVER_ERROR, {"error": str(e)})
 
     def do_POST(self):
         if not self._check_authorization():
             return
+
         if self.path.startswith("/public/api/load-member"):
-            self._send_json(200, {"items": list(DB_MEMBERS.values())})
+            self._handle_load_member()
         elif self.path.startswith("/public/api/load-assignment/"):
-            member_id = self.path.split("/")[-1]
-            items = [a for a in DB_ASSIGNMENTS.values() if str(a.get("member")) == member_id]
-            self._send_json(200, {"items": items})
+            self._handle_load_assignment()
         elif self.path.startswith("/public/api/load-output/"):
-            assignment_id = self.path.split("/")[-1]
-            items = [o for o in DB_OUTPUTS.values() if str(o.get("assignment")) == assignment_id]
-            self._send_json(200, {"items": items})
+            self._handle_load_output()
         elif self.path == "/public/api/load-report":
-            try:
-                subprocess.run(
-                    [sys.executable, "-m", "src.cli", "examples/input1.txt", "-o", "examples/report.json"],
-                    check=True, capture_output=True
-                )
-                with open("examples/report.json", "r", encoding="utf-8") as f:
-                    report_data = json.load(f)
-                self._send_json(200, {"report": report_data})
-            except Exception as e:
-                self._send_json(500, {"error": str(e)})
+            self._handle_load_report()
         else:
-            self._send_json(404, {"error": "Not found"})
+            self._send_json(STATUS_NOT_FOUND, {"error": "Not found"})
 
     def do_PATCH(self):
         if not self._check_authorization():
             return
+
         if self.path.startswith("/public/api/modify-member/"):
             try:
                 uid = int(self.path.split("/")[-1])
             except ValueError:
-                self._send_json(400, {"error": "Bad Request"})
+                self._send_json(STATUS_BAD_REQUEST, {"error": "Bad Request"})
                 return
             if uid in DB_MEMBERS:
                 DB_MEMBERS[uid].update(self._read_body())
-                self._send_json(200, {"status": "updated"})
+                self._send_json(STATUS_OK, {"status": "updated"})
             else:
-                self._send_json(404, {"error": "Member not found"})
+                self._send_json(
+                    STATUS_NOT_FOUND,
+                    {"error": "Member not found"}
+                )
+
         elif self.path.startswith("/public/api/modify-assignment/"):
             try:
                 uid = int(self.path.split("/")[-1])
             except ValueError:
-                self._send_json(400, {"error": "Bad Request"})
+                self._send_json(STATUS_BAD_REQUEST, {"error": "Bad Request"})
                 return
             if uid in DB_ASSIGNMENTS:
                 DB_ASSIGNMENTS[uid].update(self._read_body())
-                self._send_json(200, {"status": "updated"})
+                self._send_json(STATUS_OK, {"status": "updated"})
             else:
-                self._send_json(404, {"error": "Assignment not found"})
+                self._send_json(
+                    STATUS_NOT_FOUND,
+                    {"error": "Assignment not found"}
+                )
         else:
-            self._send_json(404, {"error": "Not found"})
+            self._send_json(STATUS_NOT_FOUND, {"error": "Not found"})
 
     def log_message(self, format, *args):
         pass
@@ -127,7 +167,7 @@ class ThreadingHTTPServer(ThreadingMixIn, TCPServer):
     """Многопоточный сервер с большой очередью подключений."""
     allow_reuse_address = True
     daemon_threads = True
-    request_queue_size = 128  # Увеличиваем очередь
+    request_queue_size = 128
 
 
 def run_server():
@@ -140,6 +180,7 @@ def run_server():
     except KeyboardInterrupt:
         print("\nСервер остановлен.")
         httpd.server_close()
+
 
 if __name__ == "__main__":
     run_server()

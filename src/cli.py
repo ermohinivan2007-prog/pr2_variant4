@@ -7,6 +7,7 @@ import sys
 
 READ_CHUNK_SIZE = 65536
 DEFAULT_OUTPUT = "result.json"
+EXIT_ERROR = 1
 
 
 def calculate_sha256(file_path: str) -> str:
@@ -25,10 +26,10 @@ def process_file(input_path: str, output_path: str) -> None:
         file_hash = calculate_sha256(input_path)
     except FileNotFoundError:
         print(f"Ошибка: Файл {input_path} не найден.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_ERROR)
     except PermissionError:
         print(f"Ошибка: Нет прав на чтение {input_path}.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_ERROR)
 
     result = {
         "file_name": os.path.basename(input_path),
@@ -38,7 +39,7 @@ def process_file(input_path: str, output_path: str) -> None:
 
     with open(output_path, "w", encoding="utf-8") as out_file:
         json.dump(result, out_file, ensure_ascii=False, indent=4)
-    
+
     print(f"Успешно. Хеш сохранен в {output_path}")
 
 
@@ -49,8 +50,8 @@ def main() -> None:
     )
     parser.add_argument("input", help="Путь к входному файлу")
     parser.add_argument(
-        "--output", "-o", 
-        default=DEFAULT_OUTPUT, 
+        "--output", "-o",
+        default=DEFAULT_OUTPUT,
         help=f"Путь к выходному JSON (по умолчанию {DEFAULT_OUTPUT})"
     )
     args = parser.parse_args()

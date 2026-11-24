@@ -3,7 +3,7 @@ import threading
 import time
 import pytest
 import requests
-from hypothesis import settings, HealthCheck, Phase
+from hypothesis import settings, HealthCheck
 from hypothesis.stateful import (
     RuleBasedStateMachine, rule, run_state_machine_as_test
 )
@@ -13,6 +13,10 @@ from src.server import run_server, SERVER_HOST, SERVER_PORT
 
 BASE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
 AUTH = ("admin", "secret")
+STATUS_OK = 200
+STATUS_NOT_FOUND = 404
+DEFAULT_TIMEOUT = 2
+STEP_DELAY = 0.1
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -33,64 +37,67 @@ class APITestMachine(RuleBasedStateMachine):
         self.session.auth = AUTH
 
     def _pause(self):
-        """Небольшая задержка для стабильности."""
-        time.sleep(0.1) # Увеличили паузу до 0.1 сек
+        time.sleep(STEP_DELAY)
 
     @rule(uid=st.integers(min_value=1, max_value=100))
     def test_submit_member(self, uid):
         self._pause()
         url = f"{BASE_URL}/public/api/submit-member/{uid}"
-        resp = self.session.put(url, json={"uid": uid}, timeout=2)
-        assert resp.status_code == 200
+        resp = self.session.put(url, json={"uid": uid}, timeout=DEFAULT_TIMEOUT)
+        assert resp.status_code == STATUS_OK
 
     @rule()
     def test_load_member(self):
         self._pause()
         url = f"{BASE_URL}/public/api/load-member"
-        resp = self.session.post(url, timeout=2)
-        assert resp.status_code == 200
+        resp = self.session.post(url, timeout=DEFAULT_TIMEOUT)
+        assert resp.status_code == STATUS_OK
 
     @rule(uid=st.integers(min_value=1, max_value=100))
     def test_modify_member(self, uid):
         self._pause()
         url = f"{BASE_URL}/public/api/modify-member/{uid}"
-        resp = self.session.patch(url, json={"uid": uid}, timeout=2)
-        assert resp.status_code in (200, 404)
+        resp = self.session.patch(
+            url, json={"uid": uid}, timeout=DEFAULT_TIMEOUT
+        )
+        assert resp.status_code in (STATUS_OK, STATUS_NOT_FOUND)
 
     @rule(uid=st.integers(min_value=1, max_value=100))
     def test_submit_assignment(self, uid):
         self._pause()
         url = f"{BASE_URL}/public/api/submit-assignment/{uid}"
-        resp = self.session.put(url, json={"uid": uid}, timeout=2)
-        assert resp.status_code == 200
+        resp = self.session.put(url, json={"uid": uid}, timeout=DEFAULT_TIMEOUT)
+        assert resp.status_code == STATUS_OK
 
     @rule(member_id=st.integers(min_value=1, max_value=100))
     def test_load_assignment(self, member_id):
         self._pause()
         url = f"{BASE_URL}/public/api/load-assignment/{member_id}"
-        resp = self.session.post(url, timeout=2)
-        assert resp.status_code == 200
+        resp = self.session.post(url, timeout=DEFAULT_TIMEOUT)
+        assert resp.status_code == STATUS_OK
 
     @rule(uid=st.integers(min_value=1, max_value=100))
     def test_modify_assignment(self, uid):
         self._pause()
         url = f"{BASE_URL}/public/api/modify-assignment/{uid}"
-        resp = self.session.patch(url, json={"uid": uid}, timeout=2)
-        assert resp.status_code in (200, 404)
+        resp = self.session.patch(
+            url, json={"uid": uid}, timeout=DEFAULT_TIMEOUT
+        )
+        assert resp.status_code in (STATUS_OK, STATUS_NOT_FOUND)
 
     @rule(assignment_id=st.integers(min_value=1, max_value=100))
     def test_load_output(self, assignment_id):
         self._pause()
         url = f"{BASE_URL}/public/api/load-output/{assignment_id}"
-        resp = self.session.post(url, timeout=2)
-        assert resp.status_code == 200
+        resp = self.session.post(url, timeout=DEFAULT_TIMEOUT)
+        assert resp.status_code == STATUS_OK
 
     @rule()
     def test_load_report(self):
         self._pause()
         url = f"{BASE_URL}/public/api/load-report"
-        resp = self.session.post(url, timeout=2)
-        assert resp.status_code == 200
+        resp = self.session.post(url, timeout=DEFAULT_TIMEOUT)
+        assert resp.status_code == STATUS_OK
         assert "report" in resp.json()
 
 
@@ -99,13 +106,10 @@ def test_mbt():
     settings_obj = settings(
         max_examples=5,
         stateful_step_count=5,
-        # ОТКЛЮЧАЕМ фазу shrink и генерацию новых примеров (оставляем только replay)
-        phases=[Phase.reuse, Phase.generate],
         suppress_health_check=[
             HealthCheck.too_slow,
             HealthCheck.function_scoped_fixture,
-            HealthCheck.filter_too_much,
-            HealthCheck.data_too_large
+            HealthCheck.filter_too_much
         ],
         deadline=None,
     )
