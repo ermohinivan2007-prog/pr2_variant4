@@ -3,7 +3,7 @@ import base64
 
 VALID_USERNAME = "admin"
 VALID_PASSWORD = "secret"
-EXPECTED_PARTS_COUNT = 2  
+EXPECTED_PARTS_COUNT = 2
 
 
 def check_auth(auth_header: str) -> bool:
