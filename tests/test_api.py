@@ -43,7 +43,9 @@ class APITestMachine(RuleBasedStateMachine):
     def test_submit_member(self, uid):
         self._pause()
         url = f"{BASE_URL}/public/api/submit-member/{uid}"
-        resp = self.session.put(url, json={"uid": uid}, timeout=DEFAULT_TIMEOUT)
+        resp = self.session.put(
+            url, json={"uid": uid}, timeout=DEFAULT_TIMEOUT
+        )
         assert resp.status_code == STATUS_OK
 
     @rule()
@@ -66,7 +68,9 @@ class APITestMachine(RuleBasedStateMachine):
     def test_submit_assignment(self, uid):
         self._pause()
         url = f"{BASE_URL}/public/api/submit-assignment/{uid}"
-        resp = self.session.put(url, json={"uid": uid}, timeout=DEFAULT_TIMEOUT)
+        resp = self.session.put(
+            url, json={"uid": uid}, timeout=DEFAULT_TIMEOUT
+        )
         assert resp.status_code == STATUS_OK
 
     @rule(member_id=st.integers(min_value=1, max_value=100))

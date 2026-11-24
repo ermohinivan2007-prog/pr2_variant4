@@ -3,6 +3,7 @@ import base64
 
 VALID_USERNAME = "admin"
 VALID_PASSWORD = "secret"
+EXPECTED_PARTS_COUNT = 2  
 
 
 def check_auth(auth_header: str) -> bool:
@@ -18,7 +19,7 @@ def check_auth(auth_header: str) -> bool:
         return False
 
     parts = auth_header.split()
-    if len(parts) != 2 or parts[0].lower() != "basic":
+    if len(parts) != EXPECTED_PARTS_COUNT or parts[0].lower() != "basic":
         return False
 
     try:
